@@ -19,7 +19,7 @@ of five time-series validation folds. This finding applies to the available
 data and features; it is not intended as a universal claim about all bike
 demand forecasting problems.
 
-## Research objectives
+## Project objectives
 
 The analysis addresses the following questions:
 
