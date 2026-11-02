@@ -2,11 +2,12 @@
 import json, os
 import numpy as np
 import config
-from preprocessing import load_and_clean, split_data
+from preprocessing import load_and_clean, split_data, encode_features
 from eda import run_eda
 from descriptive_stats import run_descriptive
 from probability import run_probability
-from models import train_models, evaluate, plot_predictions
+from models import train_models, evaluate, plot_predictions, lag_baseline
+from sklearn.model_selection import TimeSeriesSplit
 from inference import run_data_inference, compare_models, clt_demo
 
 
@@ -40,12 +41,35 @@ def main():
     print(f"train={len(X_train)}, test={len(X_test)}, target = hourly bike count "
           f"(test mean {y_test.mean():.0f}, SD {y_test.std():.0f})")
     baseline, improved = train_models(X_train, y_train)
+    _, m_lag = evaluate(lambda x: lag_baseline(x), X_test, y_test, "Baseline (Prev hour)")
     pred_a, m_a = evaluate(baseline, X_test, y_test, "Baseline (LinearReg)")
     pred_b, m_b = evaluate(improved, X_test, y_test, "Improved (RandForest)")
     plot_predictions(y_test, pred_a, pred_b)
-    results["models"] = {"n_train": len(X_train), "n_test": len(X_test),
+    folds = []
+    cv = TimeSeriesSplit(n_splits=5)
+    ordered = df.sort_values(["Date", "Hour"]).reset_index(drop=True)
+    encoded = encode_features(ordered).dropna(
+        subset=["Previous hour count", "Previous day count"]
+    )
+    y_all = encoded.pop("Count").to_numpy(dtype=float)
+    for fold, (tr, te) in enumerate(cv.split(encoded), 1):
+        fold_a, fold_b = train_models(encoded.iloc[tr], y_all[tr])
+        pa = fold_a.predict(encoded.iloc[te])
+        pb = fold_b.predict(encoded.iloc[te])
+        folds.append({"fold": fold, "n_train": len(tr), "n_test": len(te),
+                      "baseline_rmse": float(np.sqrt(np.mean((y_all[te] - pa) ** 2))),
+                      "random_forest_rmse": float(np.sqrt(np.mean((y_all[te] - pb) ** 2)))})
+    results["models"] = {"split": "chronological", "n_train": len(X_train), "n_test": len(X_test),
                          "test_mean": float(y_test.mean()), "test_sd": float(y_test.std()),
+                         "previous_hour": m_lag,
                          "baseline": m_a, "improved": m_b}
+    results["time_series_cv"] = {
+        "folds": folds,
+        "baseline_rmse_mean": float(np.mean([x["baseline_rmse"] for x in folds])),
+        "baseline_rmse_sd": float(np.std([x["baseline_rmse"] for x in folds], ddof=1)),
+        "random_forest_rmse_mean": float(np.mean([x["random_forest_rmse"] for x in folds])),
+        "random_forest_rmse_sd": float(np.std([x["random_forest_rmse"] for x in folds], ddof=1)),
+    }
 
     section("7. SAMPLING, CONFIDENCE INTERVALS AND HYPOTHESIS TEST (model comparison)")
     results["model_comparison"] = compare_models(y_test, pred_a, pred_b, rng)

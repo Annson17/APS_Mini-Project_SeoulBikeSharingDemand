@@ -13,7 +13,7 @@ import config
 
 
 def train_models(X_train, y_train):
-    """Baseline = Linear Regression (straight-line effects).  Improved = Random Forest Regressor."""
+    """Train the statistical baseline and the nonlinear comparison model."""
     baseline = make_pipeline(StandardScaler(), LinearRegression())
     improved = RandomForestRegressor(n_estimators=300, random_state=config.SEED, n_jobs=-1)
     baseline.fit(X_train, y_train)
@@ -21,9 +21,14 @@ def train_models(X_train, y_train):
     return baseline, improved
 
 
+def lag_baseline(X):
+    """Return the previous-hour demand baseline, available from historical data."""
+    return np.asarray(X["Previous hour count"], dtype=float)
+
+
 def evaluate(model, X_test, y_test, name):
     """RMSE (typical error in bikes/hour), MAE (average absolute error), R2 (share of variance explained)."""
-    pred = model.predict(X_test)
+    pred = model(X_test) if callable(model) else model.predict(X_test)
     m = {"rmse": float(np.sqrt(mean_squared_error(y_test, pred))),
          "mae": float(mean_absolute_error(y_test, pred)),
          "r2": float(r2_score(y_test, pred))}

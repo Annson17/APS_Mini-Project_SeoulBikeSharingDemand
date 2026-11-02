@@ -1,0 +1,56 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Test, coverage, and build artifacts
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+dist/
+build/
+*.egg-info/
+
+# Jupyter and notebook checkpoints
+.ipynb_checkpoints/
+
+# Streamlit and local application files
+.streamlit/config.toml
+
+# Generated logs and local run output
+*.log
+outputs/run_log.txt
+
+# Archive copies of the project or source data
+*.zip
+*.tar
+*.tar.gz
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor and IDE files
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo

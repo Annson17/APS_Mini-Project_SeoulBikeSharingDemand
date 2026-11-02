@@ -1,176 +1,325 @@
 # Seoul Bike Sharing Demand Analysis
 
-An Applied Probability and Statistics project that analyzes hourly bike rentals in Seoul and tests whether a Random Forest model materially outperforms a Linear Regression baseline.
+## Abstract
 
-The project has two ways to use it:
+This project analyses hourly bike rental demand in Seoul using descriptive
+statistics, probability, inferential statistics, and supervised learning. The
+main modelling objective is to compare a transparent Linear Regression model
+with a nonlinear Random Forest model under a time-aware evaluation design.
 
-- **Batch analysis:** runs the complete data preparation, EDA, descriptive statistics, probability, inference, model comparison, and Central Limit Theorem demonstrations.
-- **Interactive dashboard:** provides filters, charts, statistical tests, model comparisons, and an interactive rental prediction form in Streamlit.
+Because the observations are ordered in time, the project does not use a
+random row split. Earlier observations are used for training and later
+observations are reserved for evaluation. This provides a more realistic
+estimate of forecasting performance than mixing neighbouring hours between the
+training and test sets.
 
-## Research question
+For the operating-day dataset used here, Random Forest achieved lower error
+than Linear Regression on the final chronological holdout and across the mean
+of five time-series validation folds. This finding applies to the available
+data and features; it is not intended as a universal claim about all bike
+demand forecasting problems.
 
-> Does the improved Random Forest model predict hourly bike rentals better than the Linear Regression baseline, and is the observed improvement likely to be more than test-sample variation?
+## Research objectives
 
-## Results at a glance
+The analysis addresses the following questions:
 
-The checked-in results were generated with `SEED = 42`, a 70/30 random train/test split, and the cleaned dataset:
+1. How is hourly bike demand distributed across time, seasons, and weather
+   conditions?
+2. What probability relationships can be observed between high demand, rain,
+   rush hours, and season?
+3. Does Random Forest improve forecasting accuracy compared with Linear
+   Regression?
+4. Does the comparison remain similar when evaluated using chronological
+   holdout data and time-series cross-validation?
+5. How should the statistical results be interpreted when hourly observations
+   are temporally dependent?
 
-| Metric | Linear Regression | Random Forest |
+## Dataset
+
+The project uses the Seoul Bike Sharing Demand dataset stored at
+`data/SeoulBikeData.csv`.
+
+The source file contains 8,760 hourly records covering one year. Each record
+contains:
+
+- date and hour of observation;
+- rented bike count;
+- temperature, humidity, wind speed, visibility, dew-point temperature,
+  solar radiation, rainfall, and snowfall;
+- season;
+- holiday status;
+- whether the service was operating.
+
+The modelling task is defined as forecasting demand on days when the service is
+operating. The 295 records from non-functioning days are therefore excluded,
+rather than being converted into zero-demand observations.
+
+## Data preparation
+
+The preprocessing pipeline performs the following steps:
+
+1. Reads the CSV using the source file's `latin1` encoding.
+2. Validates the expected 14-column schema.
+3. Checks dates, missing values, category values, and hour ranges.
+4. Removes records where the service was not functioning.
+5. Sorts the remaining observations by date and hour.
+6. Converts holiday status into a binary feature.
+7. Creates `Month` and `Weekend` features.
+8. Creates two historical demand features:
+   - `Previous hour count`: the preceding available observation;
+   - `Previous day count`: the value from 24 observations earlier.
+9. Uses only rows with complete lag values for modelling.
+
+The cleaned analysis dataset contains **8,465 hourly records**. The first 24
+records do not have a complete 24-observation lag, so the modelling dataset
+contains **8,441 records**. The 8,465-row dataset is retained for exploratory,
+descriptive, probability, and inferential analysis.
+
+The current hour's rental count is never included as a predictor. Historical
+rental counts enter the models only through the lag variables.
+
+## Exploratory and statistical analysis
+
+The batch analysis produces:
+
+- demand distributions and boxplots;
+- average demand by hour;
+- hourly demand patterns by season;
+- seasonal comparisons;
+- temperature-demand scatterplots;
+- a numeric correlation matrix;
+- descriptive summaries including mean, median, variance, quartiles,
+  skewness, kurtosis, coefficient of variation, and IQR outliers;
+- conditional probabilities involving high demand, rain, rush hours, and
+  season;
+- a check of independence between high demand and rainfall;
+- the law of total probability and Bayes' theorem examples.
+
+The inferential section includes:
+
+- a confidence interval for mean hourly rentals;
+- Welch's t-test for rainy versus dry hours;
+- one-way ANOVA across seasons;
+- a chi-square test for high demand and rainfall;
+- Pearson correlation between temperature and demand;
+- paired model-error comparisons using a t-test and Wilcoxon signed-rank test;
+- bootstrap intervals for model RMSE and RMSE improvement;
+- Central Limit Theorem demonstrations.
+
+The conventional hypothesis tests are treated as exploratory. Hourly
+observations within the same day are related, so their p-values should not be
+interpreted as if the data were a collection of independent random samples.
+
+## Forecasting methodology
+
+### Forecasting approaches
+
+Three approaches are evaluated:
+
+1. **Previous-hour baseline**
+   A rule-based benchmark that uses the most recently observed demand. It is
+   not trained and provides a simple reference point.
+
+2. **Linear Regression**
+   A scaled, trained regression model using weather, calendar, seasonal, and
+   historical-demand features.
+
+3. **Random Forest**
+   A 300-tree nonlinear regression model using the same feature set as Linear
+   Regression.
+
+The models are evaluated using:
+
+- **RMSE**, which gives greater weight to large errors;
+- **MAE**, the average absolute error in bikes per hour;
+- **R²**, the proportion of target variation explained relative to predicting
+  the test-set mean.
+
+### Time-aware evaluation
+
+The observations are ordered chronologically before modelling:
+
+- the earliest 70% of observations are used for training;
+- the latest 30% are used as a final chronological holdout.
+
+The project also uses five expanding-window `TimeSeriesSplit` folds. In each
+fold, the models are trained on earlier observations and evaluated on the next
+time segment. Fold-level metrics, the mean RMSE, and the sample standard
+deviation are saved in `outputs/results.json`.
+
+### Bootstrap design
+
+Hourly observations are not independent. For the official batch comparison,
+the test-set errors are resampled using contiguous 24-observation blocks
+rather than individual rows. This preserves some of the dependence between
+nearby observations. The dashboard uses the same block structure for its
+interactive bootstrap, although the number of resamples can be selected by
+the user.
+
+## Results
+
+The checked-in results were generated using `SEED = 42`.
+
+### Final chronological holdout
+
+| Forecasting approach | RMSE | MAE | R² |
+|---|---:|---:|---:|
+| Previous-hour baseline | 325.96 | 227.04 | 0.7177 |
+| Linear Regression | 275.36 | 187.95 | 0.7985 |
+| Random Forest | **176.59** | **104.27** | **0.9171** |
+
+Random Forest reduced RMSE by **98.77 bikes per hour** compared with Linear
+Regression on the final holdout. The 95% block-bootstrap interval for this
+improvement was **[83.76, 113.95] bikes per hour**.
+
+### Five-fold time-series validation
+
+| Model | Mean RMSE | Standard deviation |
 |---|---:|---:|
-| RMSE (bikes/hour) | 423.94 | **171.30** |
-| MAE (bikes/hour) | 323.95 | **99.03** |
-| R² | 0.5518 | **0.9268** |
+| Linear Regression | 262.82 | 75.54 |
+| Random Forest | **216.11** | 66.72 |
 
-- The cleaned dataset contains **8,465 hourly records** after removing 295 non-functioning-day rows.
-- The Random Forest reduces RMSE by **252.64 bikes/hour**.
-- The paired bootstrap 95% confidence interval for the RMSE improvement is **[230.66, 273.56]** bikes/hour.
-- A paired t-test on squared errors gives `p = 1.41e-96`; the Wilcoxon signed-rank check gives `p = 2.22e-302`.
-- The Random Forest has the smaller squared error on **85.0%** of test hours.
-- Average demand is **729.16 bikes/hour** (95% t-interval: **[715.47, 742.84]**).
-- Mean demand is higher in summer (1,034.1) than winter (225.5), and rainy hours average 167.3 rentals versus 765.6 on dry hours.
+Random Forest had a lower mean RMSE across the five validation folds and a
+lower RMSE on the final chronological holdout. The fold results are available
+in `outputs/results.json`.
 
-These are associations and held-out test-set results, not causal claims.
+## Dashboard
 
-## Dashboard preview
+The Streamlit dashboard provides five sections:
 
-Run the Streamlit app to explore:
+1. **Project Overview**
+   Dataset counts, headline model metrics, validation information, and
+   interpretation notes.
 
-- Project overview and headline findings
-- Filterable exploratory analysis by season and hour
-- Model metrics, prediction scatterplots, and error distributions
-- Confidence intervals, Welch's t-test, ANOVA, chi-square, Pearson correlation, bootstrap, paired t-test, and Wilcoxon tests
-- Probability examples and Central Limit Theorem simulations
-- A form for comparing Linear Regression and Random Forest rental predictions
+2. **Exploratory Data Analysis**
+   Filters for season and hour, demand distributions, hourly patterns,
+   seasonal summaries, weather plots, correlations, the full batch-generated
+   figure set, and overall descriptive summaries.
 
-## Project workflow
+3. **Model Comparison**
+   RMSE, MAE, and R² tables, fold-level time-series validation, validation
+   plots, official bootstrap results, feature importance, actual-versus-
+   predicted plots, and error distributions.
 
-`main.py` executes the following stages:
+4. **Statistical Analysis**
+   Model comparison tests, confidence intervals, probability calculations,
+   the complete probability results, dataset inference, bootstrap analysis,
+   and CLT simulations.
 
-1. **Preprocessing**
-   - Reads `data/SeoulBikeData.csv` using `latin1` encoding.
-   - Renames the source columns to concise names.
-   - Reports missing and duplicate rows.
-   - Removes rows where `Functioning Day` is `No`.
-   - Derives `Month` and a binary `Weekend` feature.
-   - Converts `Holiday` to a binary feature and removes the original date/functioning-day columns.
-2. **Exploratory data analysis**
-   - Creates distributions, hourly patterns, seasonal comparisons, temperature scatterplots, and a correlation heatmap.
-3. **Descriptive statistics**
-   - Calculates location, spread, quartiles, skewness, kurtosis, coefficient of variation, IQR outliers, seasonal summaries, and feature correlations.
-4. **Probability**
-   - Defines high demand as rentals above the cleaned-data median.
-   - Examines rain, rush hours, conditional probability, independence, the law of total probability, and Bayes' theorem.
-5. **Inferential statistics**
-   - Computes a confidence interval for mean rentals.
-   - Tests rainy versus dry demand with Welch's t-test.
-   - Tests seasonal differences with one-way ANOVA.
-   - Tests high demand/rain independence with chi-square.
-   - Tests temperature/rental association with Pearson correlation.
-6. **Model training**
-   - Encodes `Season` with one-hot encoding.
-   - Uses a reproducible 70/30 random split.
-   - Trains a scaled Linear Regression baseline and a 300-tree Random Forest regressor.
-7. **Model comparison**
-   - Evaluates RMSE, MAE, and R² on the same held-out observations.
-   - Uses paired bootstrap intervals, a paired t-test on squared errors, a Wilcoxon signed-rank test, and sampling-distribution simulations.
-8. **CLT demonstrations**
-   - Simulates sampling distributions for hourly rentals and per-hour squared-error differences at sample sizes 1, 5, 30, and 200.
+5. **Bike Rental Prediction**
+   An input form for Linear Regression and Random Forest predictions. The form
+   includes previous-hour and previous-day demand because those values are
+   required by the trained models.
 
-## Setup
+The dashboard recalculates its interactive model views. The overview also
+loads the saved batch results from `outputs/results.json`.
 
-Python 3.9+ is recommended.
+## Project structure
+
+| File or directory | Purpose |
+|---|---|
+| `main.py` | Runs the complete batch analysis |
+| `app.py` | Streamlit dashboard |
+| `config.py` | Shared paths, seed, split size, significance level, and bootstrap size |
+| `preprocessing.py` | Schema validation, cleaning, feature engineering, and chronological split |
+| `models.py` | Forecasting baseline, model training, metrics, and prediction plots |
+| `inference.py` | Confidence intervals, hypothesis tests, bootstrap, and CLT simulations |
+| `descriptive_stats.py` | Descriptive and grouped summaries |
+| `probability.py` | Conditional probability, independence, total probability, and Bayes calculations |
+| `eda.py` | Batch exploratory figures |
+| `tests/` | Automated tests for loading, features, lags, splitting, and predictions |
+| `data/SeoulBikeData.csv` | Input dataset |
+| `outputs/results.json` | Latest structured results |
+| `outputs/run_log.txt` | Latest batch console log |
+| `outputs/figures/` | Generated figures |
+| `requirements.txt` | Version-constrained Python dependencies |
+
+## Installation
+
+The project was tested with Python 3.11. Python 3.9 or newer is recommended.
+
+Create a virtual environment:
 
 ```bash
 python -m venv .venv
 ```
 
-Activate the environment:
+Activate it on Windows PowerShell:
 
-```bash
-# Windows PowerShell
+```powershell
 .venv\Scripts\Activate.ps1
-
-# macOS/Linux
-source .venv/bin/activate
 ```
 
-Install dependencies:
+Install the dependencies:
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-## Run the batch analysis
+## Running the project
 
-From the project root:
+Run the complete batch workflow:
 
 ```bash
 python main.py
 ```
 
-The run prints each analysis stage and writes:
+This regenerates:
 
-- `outputs/results.json` - structured metrics, statistical results, and simulation summaries
-- `outputs/run_log.txt` - example output from a completed run
-- `outputs/figures/` - generated EDA, prediction, bootstrap, sampling, and CLT figures
+- `outputs/results.json`;
+- the EDA figures;
+- the model prediction figure;
+- the bootstrap and sampling figures;
+- the CLT figures.
 
-Random operations use `SEED = 42` in `config.py`. Change the shared settings there rather than editing individual modules.
+Run the tests:
 
-## Run the interactive dashboard
+```bash
+pytest -q
+```
+
+Launch the dashboard:
 
 ```bash
 streamlit run app.py
 ```
 
-The dashboard loads and cleans the data, trains both models, and caches the data, models, and predictions for the current Streamlit process. Open the local URL printed by Streamlit in a browser.
+## Reproducibility
 
-## Data
+The shared settings are defined in `config.py`:
 
-The input file is [`data/SeoulBikeData.csv`](data/SeoulBikeData.csv), containing hourly observations with:
+- random seed: `42`;
+- test proportion: `0.30`;
+- significance level: `0.05`;
+- official bootstrap resamples: `10,000`.
 
-| Source field | Meaning |
-|---|---|
-| `Date` | Observation date (`DD/MM/YYYY`) |
-| `Rented Bike Count` | Hourly rental target |
-| `Hour` | Hour of day, 0-23 |
-| `Temperature(°C)` | Temperature |
-| `Humidity(%)` | Relative humidity |
-| `Wind speed (m/s)` | Wind speed |
-| `Visibility (10m)` | Visibility |
-| `Dew point temperature(°C)` | Dew-point temperature |
-| `Solar Radiation (MJ/m2)` | Solar radiation |
-| `Rainfall(mm)` | Rainfall |
-| `Snowfall (cm)` | Snowfall |
-| `Seasons` | Spring, Summer, Autumn, or Winter |
-| `Holiday` | Holiday status |
-| `Functioning Day` | Whether the bike service was operating |
+The dependency ranges are listed in `requirements.txt`. For reproducible
+results, use the same Python version and regenerate the results from the
+original CSV rather than editing `outputs/results.json` manually.
 
-The preprocessing module maps these to `Date`, `Count`, `Hour`, `Temp`, `Humidity`, `Wind`, `Visibility`, `DewPoint`, `Solar`, `Rain`, `Snow`, `Season`, `Holiday`, and `Functioning`.
+## Limitations
 
-## Repository structure
+- The dataset covers one year and may not represent other years, locations, or
+  operating conditions.
+- Hourly observations are temporally dependent; individual rows are not
+  independent samples.
+- The previous-day feature is a 24-observation lag, not a calendar-aware
+  same-hour lookup.
+- Non-functioning days are excluded from the modelling task.
+- The Random Forest configuration is a reasonable demonstration model, not an
+  exhaustive hyperparameter search.
+- The feature set does not include rolling averages or more advanced
+  calendar-aware lag engineering.
+- The inferential tests describe associations and should not be interpreted as
+  causal evidence.
+- The dashboard prediction form requires historical lag values to be supplied
+  by the user.
 
-| Path | Purpose |
-|---|---|
-| `app.py` | Streamlit dashboard |
-| `main.py` | Batch pipeline entry point |
-| `config.py` | Paths, seed, split size, significance level, and bootstrap size |
-| `preprocessing.py` | Data loading, cleaning, feature engineering, and train/test split |
-| `eda.py` | Exploratory plots |
-| `descriptive_stats.py` | Descriptive and grouped summaries |
-| `probability.py` | Probability and Bayes calculations |
-| `inference.py` | Confidence intervals, hypothesis tests, bootstrap, and CLT simulations |
-| `models.py` | Model training, metrics, and prediction plot |
-| `data/` | Input CSV |
-| `outputs/results.json` | Latest structured batch results |
-| `outputs/run_log.txt` | Latest recorded console output |
-| `outputs/figures/` | Generated figures |
-| `requirements.txt` | Python dependencies |
-| `APS_source.zip` | Packaged source archive included with the project |
+## Conclusion
 
-## Important limitations
-
-- The split is random by hourly row, not time-based. Nearby hours can be correlated, so the test set may be easier than a future-period forecast.
-- The paired tests and row bootstrap treat the test observations as sufficiently independent; temporal dependence can make uncertainty estimates optimistic.
-- The analysis removes non-functioning days rather than modeling zero demand on those days.
-- Random Forest predictions are raw regression outputs and are not clipped to zero.
-- The results are observational: weather, season, time, and demand relationships should not be interpreted as causal without a stronger study design.
+For the operating-day observations in this dataset, Random Forest performed
+better than Linear Regression on the final chronological holdout and across
+the average of five time-series validation folds. The result supports Random
+Forest as the stronger model in this experiment, while the time-dependent
+nature of the data means that the conclusion should be interpreted as
+dataset-specific rather than universal.

@@ -73,10 +73,16 @@ def compare_models(y_test, pred_a, pred_b, rng):
     print(f"\nBaseline RMSE {rmse_a:.2f}   Improved RMSE {rmse_b:.2f}   "
           f"Observed improvement (A - B) = {diff:+.2f} bikes/hour")
 
-    # ---- Bootstrap: resample TEST ROWS with replacement, recompute RMSEs ----
-    idx = rng.integers(0, n, size=(config.N_BOOT, n))
-    boot_a = np.sqrt(se_a[idx].mean(axis=1))
-    boot_b = np.sqrt(se_b[idx].mean(axis=1))
+    # Resample contiguous 24-observation blocks rather than treating hours as independent.
+    block_ids = np.arange(n) // 24
+    blocks = np.unique(block_ids)
+    boot_a = np.empty(config.N_BOOT)
+    boot_b = np.empty(config.N_BOOT)
+    for i in range(config.N_BOOT):
+        chosen = rng.choice(blocks, size=len(blocks), replace=True)
+        sampled = np.concatenate([np.flatnonzero(block_ids == block) for block in chosen])
+        boot_a[i] = np.sqrt(se_a[sampled].mean())
+        boot_b[i] = np.sqrt(se_b[sampled].mean())
     boot_d = boot_a - boot_b
     ci_a, ci_b = np.percentile(boot_a, [2.5, 97.5]), np.percentile(boot_b, [2.5, 97.5])
     ci_d = np.percentile(boot_d, [2.5, 97.5])
