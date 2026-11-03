@@ -289,7 +289,7 @@ elif page == "🧠 Model Comparison":
     folds = pd.DataFrame(saved_results["time_series_cv"]["folds"])
     st.dataframe(folds, hide_index=True, use_container_width=True)
     fig, ax = plt.subplots(figsize=(8, 4))
-    ax.plot(folds["fold"], folds["baseline_rmse"], marker="o", label="Linear Regression")
+    ax.plot(folds["fold"], folds["linear_regression_rmse"], marker="o", label="Linear Regression")
     ax.plot(folds["fold"], folds["random_forest_rmse"], marker="o", label="Random Forest")
     ax.set_xlabel("Validation fold")
     ax.set_ylabel("RMSE (bikes/hour)")

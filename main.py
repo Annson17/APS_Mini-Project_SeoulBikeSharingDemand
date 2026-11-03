@@ -57,7 +57,7 @@ def main():
         pa = fold_a.predict(encoded.iloc[te])
         pb = fold_b.predict(encoded.iloc[te])
         folds.append({"fold": fold, "n_train": len(tr), "n_test": len(te),
-                      "baseline_rmse": float(np.sqrt(np.mean((y_all[te] - pa) ** 2))),
+                      "linear_regression_rmse": float(np.sqrt(np.mean((y_all[te] - pa) ** 2))),
                       "random_forest_rmse": float(np.sqrt(np.mean((y_all[te] - pb) ** 2)))})
     results["models"] = {"split": "chronological", "n_train": len(X_train), "n_test": len(X_test),
                          "test_mean": float(y_test.mean()), "test_sd": float(y_test.std()),
@@ -65,8 +65,8 @@ def main():
                          "baseline": m_a, "improved": m_b}
     results["time_series_cv"] = {
         "folds": folds,
-        "baseline_rmse_mean": float(np.mean([x["baseline_rmse"] for x in folds])),
-        "baseline_rmse_sd": float(np.std([x["baseline_rmse"] for x in folds], ddof=1)),
+        "linear_regression_rmse_mean": float(np.mean([x["linear_regression_rmse"] for x in folds])),
+        "linear_regression_rmse_sd": float(np.std([x["linear_regression_rmse"] for x in folds], ddof=1)),
         "random_forest_rmse_mean": float(np.mean([x["random_forest_rmse"] for x in folds])),
         "random_forest_rmse_sd": float(np.std([x["random_forest_rmse"] for x in folds], ddof=1)),
     }
